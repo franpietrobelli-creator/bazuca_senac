@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Controle — Bazuca (Simulador)</title>
+
+<style>
+/* ============================================================
+   1) VARIÁVEIS DE COR (paleta do painel militar/futurista)
+   ============================================================ */
+:root {
+  --bg: #0a0e0d;          /* fundo bem escuro */
+  --painel: #11181a;      /* cor das caixas/controles */
+  --linha: #27393a;       /* bordas e divisões */
+  --ambar: #ffb300;       /* cor de destaque (HUD) */
+  --verde: #6fe39a;       /* cor dos valores na tela */
+  --vermelho: #e23b2e;    /* botão de disparo */
+  --texto: #cfe3df;       /* texto normal */
+}
+
+/* ============================================================
+   2) ESTILO GERAL DA PÁGINA
+   ============================================================ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* fundo escuro com um leve brilho central */
+  background:
+    radial-gradient(circle at 50% 30%, #14201f 0%, var(--bg) 70%);
+  color: var(--texto);
+  font-family: "Segoe UI", Arial, sans-serif;
+
+  /* centraliza tudo na tela */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+}
+
+h1 {
+  font-size: 20px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--ambar);
+  margin: 0;
+}
+
+/* Caixa que agrupa os dois controles lado a lado */
+.controles {
+  display: flex;
+  gap: 60px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  background: var(--painel);
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  padding: 40px 60px;
+}
+
+/* Cada bloco de controle (título + controle + valor) */
+.bloco {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.rotulo {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ambar);
+}
+
+/* Texto que mostra o valor atual (estilo "display digital") */
+.valor {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 18px;
+  color: var(--verde);
+  border: 1px solid var(--linha);
+  border-radius: 6px;
+  padding: 6px 12px;
+  min-width: 150px;
+  text-align: center;
+}
+
+/* ============================================================
+   3) CONTROLE 1 — BARRA VERTICAL (ângulo -45 a +45)
+   ============================================================ */
+.barra-vertical {
+  position: relative;
+  width: 18px;
+  height: 240px;
+  background: #0c1213;
+  border: 1px solid var(--linha);
+  border-radius: 9px;
+}
+
+/* Marcador (pega) que desliza na barra */
+.marcador {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 22px;
+  background: var(--ambar);
+  border-radius: 5px;
+  cursor: grab;
+  box-shadow: 0 0 10px rgba(255, 179, 0, 0.5);
+}
+.marcador:active { cursor: grabbing; }
+
+/* Linha central da barra que marca o valor 0 */
+.linha-zero {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 50%;
+  height: 2px;
+  background: var(--linha);
+}
+
+/* ============================================================
+   4) CONTROLE 2 — BOTÃO CIRCULAR GIRATÓRIO (0 a 360)
+   ============================================================ */
+.disco {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #1c2829, #0c1213);
+  border: 2px solid var(--linha);
+  cursor: grab;
+}
+.disco:active { cursor: grabbing; }
+
+/* Ponteiro central que aponta para a direção escolhida */
+.ponteiro {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 4px;
+  height: 80px;            /* vai do centro até perto da borda */
+  margin-left: -2px;
+  background: var(--ambar);
+  border-radius: 2px;
+  /* o giro acontece em volta do centro do disco */
+  transform-origin: 50% 92px;
+  box-shadow: 0 0 8px rgba(255, 179, 0, 0.6);
+}
+
+/* Pino central do botão */
+.centro {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px;
+  border-radius: 50%;
+  background: var(--ambar);
+}
+
+/* Cada risquinho (traço) em volta do disco */
+.tick {
+  position: absolute;
+  inset: 0;                /* ocupa o disco inteiro */
+  transform-origin: 50% 50%;
+}
+.tick span {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 2px;
+  margin-left: -1px;
+  height: 8px;             /* tamanho do risquinho pequeno */
+  background: var(--linha);
+}
+.tick.maior span {
+  height: 16px;            /* risquinho maior (0, 90, 180, 270) */
+  background: var(--ambar);
+}
+
+/* Números 0 / 90 / 180 / 270 ao redor do disco */
+.numero {
+  position: absolute;
+  font-size: 12px;
+  color: var(--texto);
+  font-family: "Consolas", monospace;
+}
+.n0   { top: 26px;  left: 50%; transform: translateX(-50%); }
+.n90  { top: 50%;   right: 22px; transform: translateY(-50%); }
+.n180 { bottom: 26px; left: 50%; transform: translateX(-50%); }
+.n270 { top: 50%;   left: 22px; transform: translateY(-50%); }
+
+/* ============================================================
+   5) BOTÃO 3 — DISPARAR
+   ============================================================ */
+.atirar {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #fff;
+  background: var(--vermelho);
+  border: none;
+  border-radius: 10px;
+  padding: 18px 60px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(226, 59, 46, 0.5);
+  transition: transform 0.05s;
+}
+.atirar:hover { background: #ff4a3c; }
+.atirar:active { transform: scale(0.97); }
+
+/* Caixa de mensagem do disparo */
+.mensagem {
+  min-height: 24px;
+  font-family: "Consolas", monospace;
+  font-size: 16px;
+  color: var(--verde);
+  text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+  <h1>Painel de Controle — Bazuca</h1>
+
+  <div class="controles">
+
+    <!-- ====== CONTROLE 1: BARRA VERTICAL ====== -->
+    <div class="bloco">
+      <div class="rotulo">Elevação</div>
+      <div class="barra-vertical" id="barra">
+        <div class="linha-zero"></div>
+        <div class="marcador" id="marcador"></div>
+      </div>
+      <div class="valor" id="valorVertical">Ângulo vertical: 0°</div>
+    </div>
+
+    <!-- ====== CONTROLE 2: BOTÃO CIRCULAR ====== -->
+    <div class="bloco">
+      <div class="rotulo">Direção</div>
+      <div class="disco" id="disco">
+        <!-- os risquinhos serão criados pelo JavaScript -->
+        <div class="numero n0">0</div>
+        <div class="numero n90">90</div>
+        <div class="numero n180">180</div>
+        <div class="numero n270">270</div>
+        <div class="ponteiro" id="ponteiro"></div>
+        <div class="centro"></div>
+      </div>
+      <div class="valor" id="valorHorizontal">Direção horizontal: 0°</div>
+    </div>
+
+  </div>
+
+  <!-- ====== BOTÃO 3: DISPARAR ====== -->
+  <button class="atirar" id="botaoAtirar">ATIRAR</button>
+  <div class="mensagem" id="mensagem"></div>
+
+
+<script>
+/* ============================================================
+   VARIÁVEIS QUE GUARDAM OS VALORES ATUAIS DOS CONTROLES
+   ============================================================ */
+let anguloVertical = 0;     // de -45 até +45
+let direcaoHorizontal = 0;  // de 0 até 360
+
+/* ============================================================
+   CONTROLE 1 — BARRA VERTICAL
+   - topo = +45 / meio = 0 / base = -45
+   ============================================================ */
+const barra = document.getElementById("barra");
+const marcador = document.getElementById("marcador");
+const valorVertical = document.getElementById("valorVertical");
+
+// função que coloca o marcador numa posição e calcula o valor
+function moverMarcador(posicaoTopo) {
+  // espaço que o marcador pode percorrer (altura da barra - altura do marcador)
+  const limite = barra.clientHeight - marcador.offsetHeight;
+
+  // não deixa o marcador sair da barra (trava entre 0 e o limite)
+  if (posicaoTopo < 0) posicaoTopo = 0;
+  if (posicaoTopo > limite) posicaoTopo = limite;
+
+  // aplica a posição na tela
+  marcador.style.top = posicaoTopo + "px";
+
+  // converte a posição em valor: topo (0px) = +45, base (limite) = -45
+  anguloVertical = Math.round(((limite - posicaoTopo) / limite) * 90 - 45);
+
+  // atualiza o texto na tela
+  valorVertical.textContent = "Ângulo vertical: " + anguloVertical + "°";
+}
+
+// começa com o marcador no meio (valor 0)
+function centralizarMarcador() {
+  const limite = barra.clientHeight - marcador.offsetHeight;
+  moverMarcador(limite / 2);
+}
+centralizarMarcador();
+
+// variável que diz se o usuário está arrastando o marcador
+let arrastandoBarra = false;
+
+marcador.addEventListener("pointerdown", function () {
+  arrastandoBarra = true;
+});
+
+// enquanto o mouse se move, atualiza a barra (se estiver arrastando)
+window.addEventListener("pointermove", function (evento) {
+  if (!arrastandoBarra) return;
+
+  // pega a posição da barra na tela
+  const caixa = barra.getBoundingClientRect();
+
+  // posição do mouse dentro da barra (descontando metade do marcador para centralizar)
+  const posicao = evento.clientY - caixa.top - (marcador.offsetHeight / 2);
+
+  moverMarcador(posicao);
+});
+
+// quando solta o mouse, para de arrastar
+window.addEventListener("pointerup", function () {
+  arrastandoBarra = false;
+});
+
+
+/* ============================================================
+   CONTROLE 2 — BOTÃO CIRCULAR GIRATÓRIO
+   - gira de 0° a 360° (0 em cima, aumentando no sentido horário)
+   ============================================================ */
+const disco = document.getElementById("disco");
+const ponteiro = document.getElementById("ponteiro");
+const valorHorizontal = document.getElementById("valorHorizontal");
+
+// --- cria os risquinhos em volta do disco (um a cada 15°) ---
+for (let grau = 0; grau < 360; grau += 15) {
+  const tick = document.createElement("div");
+  tick.className = "tick";
+
+  // marca os "risquinhos maiores" nos pontos 0, 90, 180 e 270
+  if (grau % 90 === 0) {
+    tick.className = "tick maior";
+  }
+
+  // gira cada risquinho para a sua posição no círculo
+  tick.style.transform = "rotate(" + grau + "deg)";
+
+  // o <span> dentro é o tracinho em si
+  tick.appendChild(document.createElement("span"));
+
+  disco.appendChild(tick);
+}
+
+// função que gira o ponteiro e calcula o valor
+function girarPara(graus) {
+  // garante que o valor fique sempre entre 0 e 359
+  direcaoHorizontal = Math.round((graus + 360) % 360);
+
+  // gira o ponteiro na tela
+  ponteiro.style.transform = "rotate(" + direcaoHorizontal + "deg)";
+
+  // atualiza o texto na tela
+  valorHorizontal.textContent = "Direção horizontal: " + direcaoHorizontal + "°";
+}
+
+// variável que diz se o usuário está girando o disco
+let girandoDisco = false;
+
+// calcula o ângulo entre o centro do disco e a posição do mouse
+function calcularAngulo(evento) {
+  const caixa = disco.getBoundingClientRect();
+
+  // centro do disco
+  const centroX = caixa.left + caixa.width / 2;
+  const centroY = caixa.top + caixa.height / 2;
+
+  // distância do mouse até o centro
+  const dx = evento.clientX - centroX;
+  const dy = evento.clientY - centroY;
+
+  // atan2 devolve o ângulo; somamos 90 para que o 0° fique no topo
+  let angulo = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+
+  girarPara(angulo);
+}
+
+disco.addEventListener("pointerdown", function (evento) {
+  girandoDisco = true;
+  calcularAngulo(evento); // já gira ao clicar
+});
+
+window.addEventListener("pointermove", function (evento) {
+  if (girandoDisco) calcularAngulo(evento);
+});
+
+window.addEventListener("pointerup", function () {
+  girandoDisco = false;
+});
+
+
+/* ============================================================
+   BOTÃO 3 — DISPARAR
+   ============================================================ */
+const botaoAtirar = document.getElementById("botaoAtirar");
+const mensagem = document.getElementById("mensagem");
+
+botaoAtirar.addEventListener("click", function () {
+  // mostra a mensagem com os valores atuais dos dois controles
+  mensagem.innerHTML =
+    "💥 Disparo realizado!<br>" +
+    "Ângulo vertical: " + anguloVertical + "° | " +
+    "Direção horizontal: " + direcaoHorizontal + "°";
+});
+</script>
+
+</body>
+</html>
